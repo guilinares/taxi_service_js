@@ -41,10 +41,7 @@ test.each([
         password: "123456"
     };
     // When
-    const outputSignup = await signup(inputSignup);
-
-    // Then
-    expect(outputSignup).toBe(-1);
+    await expect(() => signup(inputSignup)).rejects.toThrow(new Error("Invalid cpf"))
 });
 
 test("Não deve cadastrar passageiro com email invalido", async function () {
@@ -57,13 +54,10 @@ test("Não deve cadastrar passageiro com email invalido", async function () {
         password: "123456"
     };
     // When
-    const outputSignup = await signup(inputSignup);
-
-    // Then
-    expect(outputSignup).toBe(-2);
+    await expect(() => signup(inputSignup)).rejects.toThrow(new Error("Invalid email"))
 });
 
-test("Não deve cadastrar passageiro duplicado", async function () {
+test("Não deve cadastrar passageiro com nome invalido", async function () {
     // Given
     const inputSignup = {
         name: "Gui",
@@ -73,10 +67,7 @@ test("Não deve cadastrar passageiro duplicado", async function () {
         password: "123456"
     };
     // When
-    const outputSignup = await signup(inputSignup);
-
-    // Then
-    expect(outputSignup).toBe(-3);
+    await expect(() => signup(inputSignup)).rejects.toThrow(new Error("Invalid name"))
 });
 
 test("Não deve cadastrar passageiro duplicado", async function () {
@@ -90,10 +81,7 @@ test("Não deve cadastrar passageiro duplicado", async function () {
     };
     // When
     await signup(inputSignup);
-    const outputSignup = await signup(inputSignup);
-
-    // Then
-    expect(outputSignup).toBe(-4);
+    await expect(() => signup(inputSignup)).rejects.toThrow(new Error("Duplicated account"))
 });
 
 test("Deve cadastrar motorista com sucesso", async function () {
@@ -133,7 +121,6 @@ test("Não deve cadastrar motorista", async function () {
         carPlate: "AAA999"
     };
     // When
-    const outputSignup = await signup(inputSignup);
-    // Then
-    expect(outputSignup).toBe(-5);
+    await expect(() => signup(inputSignup)).rejects.toThrow(new Error("Invalid car plate"))
+
 });
