@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import pgp from "pg-promise";
 
+const REQUESTED = "requested";
+
 export function validateCpf (cpf: string) {
 	if (!cpf) return false;
     cpf=cleanCpf(cpf);
@@ -73,4 +75,27 @@ export async function getAccount(accountId: string) {
     const [account] = await connection.query("select * from cccat14.account where account_id = $1", [accountId]);
     await connection.$pool.end();
     return account;
+}
+
+export async function requestRide(inputRideRequest: any) {
+    const connection = pgp()("postgres://postgres:admin@localhost:5432/postgres");
+    try {
+        const rideId = crypto.randomUUID();
+        const account = await getAccount(inputRideRequest.passengerId);
+        if (!account.is_passenger) throw new Error("Only passengers can request rides");
+        const [ride] = await connection.query("select * from cccat14.ride where passenger_id = $1 and status != 'completed'", [inputRideRequest.passengerId]);
+        if (ride) throw new Error("There is already a ride underway");
+        await connection.query("insert into cccat14.ride (ride_id, passenger_id, status, from_lat, from_long, to_lat, to_long, date) values($1, $2, $3, $4, $5, $6, $7, $8)",
+        [rideId, inputRideRequest.passengerId, REQUESTED, inputRideRequest.fromLat, inputRideRequest.fromLong, inputRideRequest.toLat, inputRideRequest.toLong, new Date()]);
+        return rideId;
+    } finally {
+        await connection.$pool.end();
+    }
+}
+
+export async function getRide(ride_id: string) {
+    const connection = pgp()("postgres://postgres:admin@localhost:5432/postgres");
+    const [ride] = await connection.query("select * from cccat14.ride where ride_id = $1", [ride_id]);
+    await connection.$pool.end();
+    return ride;
 }

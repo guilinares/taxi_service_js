@@ -98,7 +98,6 @@ test("Deve cadastrar motorista com sucesso", async function () {
     // When
     const outputSignup = await signup(inputSignup);
     const outputAccount = await getAccount(outputSignup.accountId);
-    console.log(outputAccount)
 
     // Then
     expect(outputSignup.accountId).toBeDefined();
