@@ -1,4 +1,24 @@
-import { getRide, requestRide, signup } from "../src/main";
+import AccountDAODatabase from "../src/AccountDAODatabase";
+import GetRide from "../src/GetRide";
+import LoggerConsole from "../src/LoggerConsole";
+import RideDAODatabase from "../src/RideDAODatabase";
+import RequestRide from "../src/RideRequest";
+import Signup from "../src/Signup";
+
+let signup: Signup;
+let requestRide: RequestRide;
+let getRide: GetRide;
+
+beforeEach(() => {
+    const accountDAO = new AccountDAODatabase();
+    const logger = new LoggerConsole();
+    signup = new Signup(accountDAO, logger);
+
+    const rideDAO = new RideDAODatabase();
+    requestRide = new RequestRide(accountDAO, rideDAO, logger);
+
+    getRide = new GetRide(rideDAO, logger);
+});
 
 test("Deve solicitar uma corrida com sucesso", async () => {
     const inputSignup = {
@@ -9,7 +29,7 @@ test("Deve solicitar uma corrida com sucesso", async () => {
         password: "123456"
     };
 
-    const {accountId} = await signup(inputSignup);
+    const {accountId} = await signup.execute(inputSignup);
 
     const inputRideRequest = {
         passengerId: accountId,
@@ -19,8 +39,8 @@ test("Deve solicitar uma corrida com sucesso", async () => {
         toLong: 654
     }
 
-    const outputResquestRide = await requestRide(inputRideRequest);
-    const ride = await getRide(outputResquestRide);
+    const outputResquestRide = await requestRide.execute(inputRideRequest);
+    const ride = await getRide.execute(outputResquestRide);
 
     expect(outputResquestRide).toBeDefined();
     expect(ride.ride_id).toBeDefined();
@@ -38,7 +58,7 @@ test("Não deve solicitar uma corrida se não for passageiro", async () => {
         password: "123456"
     };
 
-    const {accountId} = await signup(inputSignup);
+    const {accountId} = await signup.execute(inputSignup);
 
     const inputRideRequest = {
         passengerId: accountId,
@@ -48,7 +68,7 @@ test("Não deve solicitar uma corrida se não for passageiro", async () => {
         toLong: 654
     }
 
-    await expect(() => requestRide(inputRideRequest)).rejects.toThrow(new Error("Only passengers can request rides"));
+    await expect(() => requestRide.execute(inputRideRequest)).rejects.toThrow(new Error("Only passengers can request rides"));
 });
 
 test("Não deve solicitar uma corrida se já existir uma em andamento", async () => {
@@ -60,7 +80,7 @@ test("Não deve solicitar uma corrida se já existir uma em andamento", async ()
         password: "123456"
     };
 
-    const {accountId} = await signup(inputSignup);
+    const {accountId} = await signup.execute(inputSignup);
 
     const inputRideRequest = {
         passengerId: accountId,
@@ -70,6 +90,6 @@ test("Não deve solicitar uma corrida se já existir uma em andamento", async ()
         toLong: 654
     }
 
-    await requestRide(inputRideRequest);
-    await expect(() => requestRide(inputRideRequest)).rejects.toThrow(new Error("There is already a ride underway"));
+    await requestRide.execute(inputRideRequest);
+    await expect(() => requestRide.execute(inputRideRequest)).rejects.toThrow(new Error("There is already a ride underway"));
 });
