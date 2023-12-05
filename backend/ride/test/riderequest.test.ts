@@ -1,23 +1,28 @@
-import AccountDAODatabase from "../src/AccountDAODatabase";
-import GetRide from "../src/GetRide";
-import LoggerConsole from "../src/LoggerConsole";
-import RideDAODatabase from "../src/RideDAODatabase";
-import RequestRide from "../src/RideRequest";
-import Signup from "../src/Signup";
+import GetRide from "../src/application/usecases/GetRide";
+import LoggerConsole from "../src/infra/logger/LoggerConsole";
+import RequestRide from "../src/application/usecases/RequestRide";
+import Signup from "../src/application/usecases/Signup";
+import AccountRepositoryDatabase from "../src/infra/repository/AccountRepositoryDatabase";
+import RideRepositoryDatabase from "../src/infra/repository/RideRepositoryDatabase";
+import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
+import DatabaseConnection from "../src/infra/database/DatabaseConncetion";
 
 let signup: Signup;
 let requestRide: RequestRide;
 let getRide: GetRide;
+let databaseConnection: DatabaseConnection;
+
 
 beforeEach(() => {
-    const accountDAO = new AccountDAODatabase();
+    databaseConnection = new PgPromiseAdapter();
+    const accountRepository = new AccountRepositoryDatabase(databaseConnection);
     const logger = new LoggerConsole();
-    signup = new Signup(accountDAO, logger);
+    signup = new Signup(accountRepository, logger);
 
-    const rideDAO = new RideDAODatabase();
-    requestRide = new RequestRide(accountDAO, rideDAO, logger);
+    const rideRepository = new RideRepositoryDatabase(databaseConnection);
+    requestRide = new RequestRide(accountRepository, rideRepository, logger);
 
-    getRide = new GetRide(rideDAO, logger);
+    getRide = new GetRide(rideRepository, logger);
 });
 
 test("Deve solicitar uma corrida com sucesso", async () => {
@@ -40,12 +45,10 @@ test("Deve solicitar uma corrida com sucesso", async () => {
     }
 
     const outputResquestRide = await requestRide.execute(inputRideRequest);
-    const ride = await getRide.execute(outputResquestRide);
-
+    const ride = await getRide.execute(outputResquestRide.rideId);
     expect(outputResquestRide).toBeDefined();
-    expect(ride.ride_id).toBeDefined();
+    expect(ride.rideId).toBeDefined();
     expect(ride.status).toBe("requested");
-    console.log(ride.date);
     expect(ride.date).toBeDefined();
 });
 
@@ -55,6 +58,8 @@ test("Não deve solicitar uma corrida se não for passageiro", async () => {
         email: `gui.abreu${Math.random()}@gmail.com`,
         cpf: "72969240041",
         isPassenger: false,
+        isDriver: true,
+        carPlate: "AAA9999",
         password: "123456"
     };
 
@@ -92,4 +97,8 @@ test("Não deve solicitar uma corrida se já existir uma em andamento", async ()
 
     await requestRide.execute(inputRideRequest);
     await expect(() => requestRide.execute(inputRideRequest)).rejects.toThrow(new Error("There is already a ride underway"));
+});
+
+afterEach(async () => {
+    await databaseConnection.close(); 
 });

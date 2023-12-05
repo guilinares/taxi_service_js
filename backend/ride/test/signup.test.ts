@@ -1,19 +1,24 @@
-import AccountDAO from "../src/AccountDAO";
-import AccountDAODatabase from "../src/AccountDAODatabase";
-import GetAccount from "../src/GetAccount";
-import Logger from "../src/Logger";
-import LoggerConsole from "../src/LoggerConsole";
-import Signup from "../src/Signup";
+import Account from "../src/domain/Account";
+import AccountRepository from "../src/application/repository/AccountRepository";
+import AccountRepositoryDatabase from "../src/infra/repository/AccountRepositoryDatabase";
+import DatabaseConnection from "../src/infra/database/DatabaseConncetion";
+import GetAccount from "../src/application/usecases/GetAccount";
+import Logger from "../src/application/logger/Logger";
+import LoggerConsole from "../src/infra/logger/LoggerConsole";
+import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
+import Signup from "../src/application/usecases/Signup";
 import sinon from "sinon";
 
 let signup: Signup;
 let getAccount: GetAccount;
+let databaseConnection: DatabaseConnection;
 
 beforeEach(() => {
-    const accountDAO = new AccountDAODatabase();
+    databaseConnection = new PgPromiseAdapter();
+    const accountRepository = new AccountRepositoryDatabase(databaseConnection);
     const logger = new LoggerConsole();
-    signup = new Signup(accountDAO, logger);
-    getAccount = new GetAccount(accountDAO);
+    signup = new Signup(accountRepository, logger);
+    getAccount = new GetAccount(accountRepository);
 });
 
 test("Deve cadastrar passageiro com sucesso com stub", async function () {
@@ -24,9 +29,9 @@ test("Deve cadastrar passageiro com sucesso com stub", async function () {
         isPassenger: true,
         password: "123456"
     };
-    const stubAccountDAOSave = sinon.stub(AccountDAODatabase.prototype, "save").resolves();
-    const stubAccountDAOGetByEmail = sinon.stub(AccountDAODatabase.prototype, "getByEmail").resolves(null);
-    const stubAccountDAOGetById = sinon.stub(AccountDAODatabase.prototype, "getById").resolves(inputSignup);
+    const stubAccountDAOSave = sinon.stub(AccountRepositoryDatabase.prototype, "save").resolves();
+    const stubAccountDAOGetByEmail = sinon.stub(AccountRepositoryDatabase.prototype, "getByEmail").resolves(undefined);
+    const stubAccountDAOGetById = sinon.stub(AccountRepositoryDatabase.prototype, "getById").resolves(Account.create(inputSignup.name, inputSignup.email, inputSignup.cpf, "", inputSignup.isPassenger, false));
     // Given
     // When
     const outputSignup = await signup.execute(inputSignup);
@@ -34,9 +39,9 @@ test("Deve cadastrar passageiro com sucesso com stub", async function () {
 
     // Then
     expect(outputSignup.accountId).toBeDefined();
-    expect(outputAccount.name).toBe(inputSignup.name);
-    expect(outputAccount.email).toBe(inputSignup.email);
-    expect(outputAccount.cpf).toBe(inputSignup.cpf);
+    expect(outputAccount?.name).toBe(inputSignup.name);
+    expect(outputAccount?.email).toBe(inputSignup.email);
+    expect(outputAccount?.cpf).toBe(inputSignup.cpf);
 
     stubAccountDAOSave.restore();
     stubAccountDAOGetByEmail.restore();
@@ -59,9 +64,9 @@ test("Deve cadastrar passageiro com sucesso com mock", async function () {
     const outputAccount = await getAccount.execute(outputSignup.accountId)
     // Then
     expect(outputSignup.accountId).toBeDefined();
-    expect(outputAccount.name).toBe(inputSignup.name);
-    expect(outputAccount.email).toBe(inputSignup.email);
-    expect(outputAccount.cpf).toBe(inputSignup.cpf);
+    expect(outputAccount?.name).toBe(inputSignup.name);
+    expect(outputAccount?.email).toBe(inputSignup.email);
+    expect(outputAccount?.cpf).toBe(inputSignup.cpf);
     mockLogger.verify();
     mockLogger.restore;
 });
@@ -74,7 +79,7 @@ test("Deve cadastrar passageiro com sucesso com fake", async function () {
         isPassenger: true,
         password: "123456"
     };
-    const accountDAO: AccountDAO = {
+    const accountRepository: AccountRepository = {
         async save(account: any): Promise<void> {
         },
         async getById(accountId: string): Promise<any> {
@@ -88,17 +93,17 @@ test("Deve cadastrar passageiro com sucesso com fake", async function () {
         log(message: string): void {
         }
     }
-    const getAccount = new GetAccount(accountDAO);
-    const signup = new Signup(accountDAO, logger);
+    const getAccount = new GetAccount(accountRepository);
+    const signup = new Signup(accountRepository, logger);
     // Given
     // When
     const outputSignup = await signup.execute(inputSignup);
     const outputAccount = await getAccount.execute(outputSignup.accountId)
     // Then
     expect(outputSignup.accountId).toBeDefined();
-    expect(outputAccount.name).toBe(inputSignup.name);
-    expect(outputAccount.email).toBe(inputSignup.email);
-    expect(outputAccount.cpf).toBe(inputSignup.cpf);
+    expect(outputAccount?.name).toBe(inputSignup.name);
+    expect(outputAccount?.email).toBe(inputSignup.email);
+    expect(outputAccount?.cpf).toBe(inputSignup.cpf);
 });
 
 test("Não deve cadastrar passageiro com cpf invalido", async function () {
@@ -106,7 +111,7 @@ test("Não deve cadastrar passageiro com cpf invalido", async function () {
     const inputSignup = {
         name: "Guilherme Linares",
         email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: null,
+        cpf: "1111111111111111",
         isPassenger: true,
         password: "123456"
     };
@@ -173,11 +178,11 @@ test("Deve cadastrar motorista com sucesso", async function () {
 
     // Then
     expect(outputSignup.accountId).toBeDefined();
-    expect(outputAccount.name).toBe(inputSignup.name);
-    expect(outputAccount.email).toBe(inputSignup.email);
-    expect(outputAccount.cpf).toBe(inputSignup.cpf);
-    expect(outputAccount.is_passenger).toBe(false);
-    expect(outputAccount.is_driver).toBe(true);
+    expect(outputAccount?.name).toBe(inputSignup.name);
+    expect(outputAccount?.email).toBe(inputSignup.email);
+    expect(outputAccount?.cpf).toBe(inputSignup.cpf);
+    expect(outputAccount?.isPassenger).toBe(false);
+    expect(outputAccount?.isDriver).toBe(true);
     expect(spyLogger.calledOnce).toBeTruthy();
     expect(spyLogger.calledWith("signup Guilherme Linares")).toBeTruthy();
     spyLogger.restore;
@@ -196,4 +201,8 @@ test("Não deve cadastrar motorista", async function () {
     };
     // When
     await expect(() => signup.execute(inputSignup)).rejects.toThrow(new Error("Invalid car plate"))
+});
+
+afterEach(async () => {
+    await databaseConnection.close(); 
 });
