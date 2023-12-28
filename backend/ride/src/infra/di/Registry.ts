@@ -1,7 +1,8 @@
 export default class Registry {
     dependencies: { [name: string]: any }
+    static instance: Registry;
 
-    constructor () {
+    private constructor () {
         this.dependencies = {};
     }
 
@@ -11,5 +12,12 @@ export default class Registry {
 
     inject (name: string) {
         return this.dependencies[name];
+    }
+
+    static getInstance () {
+        if (!Registry.instance) {
+            Registry.instance = new Registry();
+        }
+        return Registry.instance;
     }
 }

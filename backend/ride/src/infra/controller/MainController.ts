@@ -8,9 +8,9 @@ export default class MainController {
 
     constructor (registry: Registry) {
 
-        const httpServer = registry.inject("httpServer");
-        const signup = registry.inject("signup");
-        const getAccount = registry.inject("getAccount");
+        const httpServer = Registry.getInstance().inject("httpServer");
+        const signup = Registry.getInstance().inject("signup");
+        const getAccount = Registry.getInstance().inject("getAccount");
 
         httpServer.register("post", "/signup", async function (params: any, body:any) {
             const output = await signup.execute(body);
