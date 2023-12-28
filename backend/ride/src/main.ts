@@ -23,5 +23,5 @@ registry.register("signup", signup);
 registry.register("getAccount", getAccount);
 
 
-new MainController(registry);
+new MainController();
 httpServer.listen(3000);
