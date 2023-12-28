@@ -6,6 +6,7 @@ import AccountRepositoryDatabase from "../src/infra/repository/AccountRepository
 import RideRepositoryDatabase from "../src/infra/repository/RideRepositoryDatabase";
 import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
 import DatabaseConnection from "../src/infra/database/DatabaseConncetion";
+import PositionRepositoryDatabase from "../src/infra/repository/PositionRepositoryDatabase";
 
 let signup: Signup;
 let requestRide: RequestRide;
@@ -21,8 +22,9 @@ beforeEach(() => {
 
     const rideRepository = new RideRepositoryDatabase(databaseConnection);
     requestRide = new RequestRide(accountRepository, rideRepository, logger);
+    const positionRepository = new PositionRepositoryDatabase(databaseConnection);
 
-    getRide = new GetRide(rideRepository, logger);
+    getRide = new GetRide(rideRepository, positionRepository, logger);
 });
 
 test("Deve solicitar uma corrida com sucesso", async () => {

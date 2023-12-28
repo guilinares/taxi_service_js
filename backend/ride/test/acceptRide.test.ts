@@ -8,6 +8,7 @@ import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
 import RequestRide from "../src/application/usecases/RequestRide";
 import RideRepositoryDatabase from "../src/infra/repository/RideRepositoryDatabase";
 import Signup from "../src/application/usecases/Signup";
+import PositionRepositoryDatabase from "../src/infra/repository/PositionRepositoryDatabase";
 
 let signup: Signup;
 let getAccount: GetAccount;
@@ -24,8 +25,9 @@ beforeEach(() => {
     const logger = new LoggerConsole();
     signup = new Signup(accountRepository, logger);
     const rideRepository = new RideRepositoryDatabase(databaseConnection);
+    const positionRepository = new PositionRepositoryDatabase(databaseConnection);
     requestRide = new RequestRide(accountRepository, rideRepository, logger);
-    getRide = new GetRide(rideRepository, logger);
+    getRide = new GetRide(rideRepository, positionRepository, logger);
     getAccount =  new GetAccount(accountRepository);
     acceptRide = new AcceptRide(accountRepository, rideRepository);
 })

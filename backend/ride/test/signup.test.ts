@@ -8,6 +8,7 @@ import LoggerConsole from "../src/infra/logger/LoggerConsole";
 import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
 import Signup from "../src/application/usecases/Signup";
 import sinon from "sinon";
+import Name from "../src/domain/Name";
 
 let signup: Signup;
 let getAccount: GetAccount;
@@ -80,10 +81,10 @@ test("Deve cadastrar passageiro com sucesso com fake", async function () {
         password: "123456"
     };
     const accountRepository: AccountRepository = {
-        async save(account: any): Promise<void> {
+        async save(account: Account): Promise<void> {
         },
-        async getById(accountId: string): Promise<any> {
-            return inputSignup;
+        async getById(accountId: string): Promise<Account | undefined> {
+            return Account.restore(accountId, inputSignup.name, inputSignup.email, inputSignup.cpf, "", inputSignup.isPassenger, false);
         },
         async getByEmail(email: string): Promise<any> {
             return undefined;
