@@ -1,20 +1,20 @@
-import AcceptRide from "../src/application/usecases/AcceptRide";
-import FinishRide from "../src/application/usecases/FinishRide";
-import GetAccount from "../src/application/usecases/GetAccount";
-import GetRide from "../src/application/usecases/GetRide";
-import RequestRide from "../src/application/usecases/RequestRide";
-import Signup from "../src/application/usecases/Signup";
-import StartRide from "../src/application/usecases/StartRide";
-import UpdatePosition from "../src/application/usecases/UpdatePosition";
-import DatabaseConnection from "../src/infra/database/DatabaseConncetion";
-import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
+import AcceptRide from "../src/application/usecase/AcceptRide";
+import GetRide from "../src/application/usecase/GetRide";
 import LoggerConsole from "../src/infra/logger/LoggerConsole";
-import AccountRepositoryDatabase from "../src/infra/repository/AccountRepositoryDatabase";
-import PositionRepositoryDatabase from "../src/infra/repository/PositionRepositoryDatabase";
+import RequestRide from "../src/application/usecase/RequestRide";
 import RideRepositoryDatabase from "../src/infra/repository/RideRepositoryDatabase";
+import StartRide from "../src/application/usecase/StartRide";
+import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
+import DatabaseConnection from "../src/infra/database/DatabaseConnection";
+import UpdatePosition from "../src/application/usecase/UpdatePosition";
+import PositionRepositoryDatabase from "../src/infra/repository/PositionRepositoryDatabase";
+import FinishRide from "../src/application/usecase/FinishRide";
+import AccountGateway from "../src/application/gateway/AccountGateway";
+import AccountGatewayHttp from "../src/infra/gateway/AccountGatewayHttp";
+import PaymentGatewayHttp from "../src/infra/gateway/PaymentGatewayHttp";
+import Queue from "../src/infra/queue/Queue";
 
-let signup: Signup;
-let getAccount: GetAccount;
+
 let requestRide: RequestRide;
 let getRide: GetRide;
 let acceptRide: AcceptRide;
@@ -22,78 +22,86 @@ let startRide: StartRide;
 let databaseConnection: DatabaseConnection;
 let updatePosition: UpdatePosition;
 let finishRide: FinishRide;
+let accountGateway: AccountGateway;
 
 beforeEach(() => {
-    databaseConnection = new PgPromiseAdapter();
-    const accountRepository = new AccountRepositoryDatabase(databaseConnection);
-    const logger = new LoggerConsole();
-    const rideRepository = new RideRepositoryDatabase(databaseConnection);
-    const positionRepository = new PositionRepositoryDatabase(databaseConnection);
-    signup = new Signup(accountRepository, logger);
-    requestRide = new RequestRide(accountRepository, rideRepository, logger);
-    getRide = new GetRide(rideRepository, positionRepository, logger);
-    getAccount =  new GetAccount(accountRepository);
-    acceptRide = new AcceptRide(accountRepository, rideRepository);
-    startRide = new StartRide(rideRepository);
-    updatePosition = new UpdatePosition(rideRepository, positionRepository);
-    finishRide = new FinishRide(rideRepository, positionRepository);
+	databaseConnection = new PgPromiseAdapter();
+	const rideRepository = new RideRepositoryDatabase(databaseConnection);
+	const positionRepository = new PositionRepositoryDatabase(databaseConnection);
+	const logger = new LoggerConsole();
+	accountGateway = new AccountGatewayHttp();
+	requestRide = new RequestRide(rideRepository, accountGateway, logger);
+	getRide = new GetRide(rideRepository, positionRepository, logger);
+	acceptRide = new AcceptRide(rideRepository, accountGateway);
+	startRide = new StartRide(rideRepository);
+	updatePosition = new UpdatePosition(rideRepository, positionRepository);
+	const paymentGateway = new PaymentGatewayHttp();
+	const queue: Queue = {
+		async publish (queue: string, data: any): Promise<void> {
+		},
+		async consume (queue: string, callback: Function): Promise<void> {
+		}
+	}
+	finishRide = new FinishRide(rideRepository, paymentGateway, queue);
+})
+
+test("Deve iniciar uma corrida", async function () {
+	const inputSignupPassenger = {
+		name: "John Doe",
+		email: `john.doe${Math.random()}@gmail.com`,
+		cpf: "97456321558",
+		isPassenger: true,
+		password: "123456"
+	};
+	const outputSignupPassenger = await accountGateway.signup(inputSignupPassenger);
+	const inputRequestRide = {
+		passengerId: outputSignupPassenger.accountId,
+		fromLat: -27.584905257808835,
+		fromLong: -48.545022195325124,
+		toLat: -27.496887588317275,
+		toLong: -48.522234807851476
+	};
+	const outputRequestRide = await requestRide.execute(inputRequestRide);
+	const inputSignupDriver = {
+		name: "John Doe",
+		email: `john.doe${Math.random()}@gmail.com`,
+		cpf: "97456321558",
+		carPlate: "AAA9999",
+		isDriver: true,
+		password: "123456"
+	};
+	const outputSignupDriver = await accountGateway.signup(inputSignupDriver);
+	const inputAcceptRide = {
+		rideId: outputRequestRide.rideId,
+		driverId: outputSignupDriver.accountId
+	}
+	await acceptRide.execute(inputAcceptRide);
+	const inputStartRide = {
+		rideId: outputRequestRide.rideId
+	};
+	await startRide.execute(inputStartRide);
+	const inputUpdatePosition1 = {
+		rideId: outputRequestRide.rideId,
+		lat: -27.584905257808835,
+		long: -48.545022195325124
+	};
+	await updatePosition.execute(inputUpdatePosition1);
+	const inputUpdatePosition2 = {
+		rideId: outputRequestRide.rideId,
+		lat: -27.496887588317275,
+		long: -48.522234807851476
+	};
+	await updatePosition.execute(inputUpdatePosition2);
+	const inputFinishRide = {
+		rideId: outputRequestRide.rideId
+	};
+	await finishRide.execute(inputFinishRide);
+	const outputGetRide = await getRide.execute(outputRequestRide.rideId);
+	expect(outputGetRide.status).toBe("completed");
+	expect(outputGetRide.distance).toBe(10);
+	expect(outputGetRide.fare).toBe(21);
 });
 
-test("Deve finalizar a corrida com sucesso",async () => {
-    const inputSignupPassenger = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "72969240041",
-        isPassenger: true,
-        password: "123456"
-    };
-    const outputSignupPassenger = await signup.execute(inputSignupPassenger);
-    const inputRideRequest = {
-        passengerId: outputSignupPassenger.accountId,
-        fromLat: -23.539989,
-        fromLong: -46.592060,
-        toLat: -23.547858,
-        toLong: -46.610637
-    }
-    const outputRequestRide = await requestRide.execute(inputRideRequest);
-    const inputSignupDriver = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "72969240041",
-        isPassenger: false,
-        isDriver: true,
-        carPlate: "AAA9999",
-        password: "123456"
-    };
-    const outputSignupDriver = await signup.execute(inputSignupDriver);
-    const inputAcceptRide = {
-        rideId: outputRequestRide.rideId,
-        driverId: outputSignupDriver.accountId
-    }
-    await acceptRide.execute(inputAcceptRide);
-    const inputStartRide = {
-        rideId: outputRequestRide.rideId
-    }
-    await startRide.execute(inputStartRide);
-    const inputUpdatePosition1 = {
-        rideId: outputRequestRide.rideId,
-        lat: -23.539989,
-        long: -46.592060
-    };
-    await updatePosition.execute(inputUpdatePosition1);
-    const inputUpdatePosition2 = {
-        rideId: outputRequestRide.rideId,
-        lat: -23.547858,
-        long: -46.610637
-    };
-    await updatePosition.execute(inputUpdatePosition2);
-    const inputFinishRide = {
-        rideId: outputRequestRide.rideId
-    }
-    await finishRide.execute(inputFinishRide);
-    const outputGetRideStarted = await getRide.execute(outputRequestRide.rideId);
-    console.log(outputGetRideStarted);
-    expect(outputGetRideStarted.status).toBe("completed");
-    expect(outputGetRideStarted.distance).toBe(2);
-    expect(outputGetRideStarted.fare).toBe(4.2);
+afterEach(async () => {
+	await databaseConnection.close();
 });

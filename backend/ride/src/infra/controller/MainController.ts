@@ -1,32 +1,28 @@
-import GetAccount from "../../application/usecases/GetAccount";
 import HttpServer from "../http/HttpServer";
-import Signup from "../../application/usecases/Signup";
 import Registry, { inject } from "../di/Registry";
+import RequestRide from "../../application/usecase/RequestRide";
+import Queue from "../queue/Queue";
 
 // Interface Adapter
 export default class MainController {
-    @inject("httpServer")
-    httpServer?: HttpServer;
-    @inject("signup")
-    signup?: Signup;
-    @inject("getAccount")
-    getAccount?: GetAccount; 
+	@inject("httpServer")
+	httpServer?: HttpServer;
+	@inject("requestRide")
+	requestRide?: RequestRide;
+	@inject("queue")
+	queue?: Queue;
 
+	constructor () {
 
-    constructor () {
+		this.httpServer?.register("post", "/request_ride", async (params: any, body: any) => {
+			const output = await this.requestRide?.execute(body);
+			return output;
+		});
 
-        // const httpServer = Registry.getInstance().inject("httpServer");
-        // const signup = Registry.getInstance().inject("signup");
-        // const getAccount = Registry.getInstance().inject("getAccount");
+		this.httpServer?.register("post", "/request_ride_async", async (params: any, body: any) => {
+			await this.queue?.publish("requestRide", body);
+		});
 
-        this.httpServer?.register("post", "/signup", async (params: any, body:any) => {
-            const output = await this.signup?.execute(body);
-            return output;
-        });
+	}
 
-        this.httpServer?.register("get", "/get_account/:accountId", async (params: any, body: any) => {
-            const output = await this.getAccount?.execute(params.accountId);
-            return output;
-        });
-    }
 }

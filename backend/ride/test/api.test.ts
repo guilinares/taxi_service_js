@@ -1,110 +1,59 @@
+import DatabaseConnection from "../src/infra/database/DatabaseConnection";
+import LoggerConsole from "../src/infra/logger/LoggerConsole";
+import PgPromiseAdapter from "../src/infra/database/PgPromiseAdapter";
+import RequestRide from "../src/application/usecase/RequestRide";
+import RideRepositoryDatabase from "../src/infra/repository/RideRepositoryDatabase";
+import PositionRepositoryDatabase from "../src/infra/repository/PositionRepositoryDatabase";
+import AccountGatewayHttp from "../src/infra/gateway/AccountGatewayHttp";
+import AccountGateway from "../src/application/gateway/AccountGateway";
 import axios from "axios";
-import DatabaseConnection from "../src/infra/database/DatabaseConncetion";
+import GetRideByPassengerId from "../src/application/usecase/GetRideByPassengerId";
 
-axios.defaults.validateStatus = function () { return true };
+async function sleep (time: number) {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(time);
+		}, time);
+	})
+}
 
-test("Deve realizar signup de passageiro via API", async () => {
-    const inputSignup = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "58849157053",
-        is_passenger: true,
-        password: "123456"
-    };
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    const outputSignup = responseSignup.data;
-    const responseGetAccount = await axios.get(`http://localhost:3000/get_account/${outputSignup.accountId}`)
-    const outputGetAccount = responseGetAccount.data;
-    expect(outputSignup.accountId).toBeDefined();
-    expect(outputGetAccount.name).toBe(inputSignup.name);
-    expect(outputGetAccount.email).toBe(inputSignup.email);
+let requestRide: RequestRide;
+let getRideByPassengerId: GetRideByPassengerId;
+let databaseConnection: DatabaseConnection;
+let accountGateway: AccountGateway;
+
+beforeEach(() => {
+	databaseConnection = new PgPromiseAdapter();
+	const rideRepository = new RideRepositoryDatabase(databaseConnection);
+	const positionRepository = new PositionRepositoryDatabase(databaseConnection);
+	const logger = new LoggerConsole();
+	accountGateway = new AccountGatewayHttp();
+	requestRide = new RequestRide(rideRepository, accountGateway, logger);
+	getRideByPassengerId = new GetRideByPassengerId(rideRepository, positionRepository, logger);
+})
+
+test("Deve solicitar uma corrida", async function () {
+	const inputSignup = {
+		name: "John Doe",
+		email: `john.doe${Math.random()}@gmail.com`,
+		cpf: "97456321558",
+		isPassenger: true,
+		password: "123456"
+	};
+	const outputSignup = await accountGateway.signup(inputSignup);
+	const inputRequestRide = {
+		passengerId: outputSignup.accountId,
+		fromLat: -27.584905257808835,
+		fromLong: -48.545022195325124,
+		toLat: -27.496887588317275,
+		toLong: -48.522234807851476
+	};
+	await axios.post("http://localhost:3000/request_ride_async", inputRequestRide);
+	await sleep(200);
+	const outputGetRide = await getRideByPassengerId.execute(outputSignup.accountId);
+	expect(outputGetRide.status).toBe("requested");
 });
 
-test("Não deve realizar signup de passageiro via API se o nome não for valido", async () => {
-    const inputSignup = {
-        name: "Guilherme",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "58849157053",
-        is_passenger: true,
-        password: "123456"
-    };
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    expect(responseSignup.status).toBe(422);
-    expect(responseSignup.data.message).toBe("Invalid name");
-}); 
-
-test("Não deve realizar signup de passageiro via API se o nome não for valido", async () => {
-    const inputSignup = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}`,
-        cpf: "58849157053",
-        is_passenger: true,
-        password: "123456"
-    };
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    expect(responseSignup.status).toBe(422);
-    expect(responseSignup.data.message).toBe("Invalid email");
-}); 
-
-test("Não deve realizar signup de passageiro via API se o nome não for valido", async () => {
-    const inputSignup = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "5884915705",
-        isPassenger: true,
-        password: "123456"
-    };
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    expect(responseSignup.status).toBe(422);
-    expect(responseSignup.data.message).toBe("Invalid cpf");
-}); 
-
-test("Não deve realizar signup de passageiro via API se o nome não for valido", async () => {
-    const inputSignup = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "58849157053",
-        isPassenger: true,
-        password: "123456"
-    };
-    await axios.post("http://localhost:3000/signup", inputSignup);
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    expect(responseSignup.status).toBe(422);
-    expect(responseSignup.data.message).toBe("Duplicated account");
-}); 
-
-test("Deve realizar signup de motorista via API", async () => {
-    const inputSignup = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "58849157053",
-        isPassenger: false,
-        isDriver: true,
-        password: "123456",
-        carPlate: "AAA9999"
-    };
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    const outputSignup = responseSignup.data;
-    const responseGetAccount = await axios.get(`http://localhost:3000/get_account/${outputSignup.accountId}`)
-    const outputGetAccount = responseGetAccount.data;
-    console.log(outputGetAccount);
-    expect(outputSignup.accountId).toBeDefined();
-    expect(outputGetAccount.name).toBe(inputSignup.name);
-    expect(outputGetAccount.email).toBe(inputSignup.email);
-    expect(outputGetAccount.isDriver).toBe(true);
-});
-
-test("Deve realizar signup de motorista via API", async () => {
-    const inputSignup = {
-        name: "Guilherme Linares",
-        email: `gui.abreu${Math.random()}@gmail.com`,
-        cpf: "58849157053",
-        carPlate: "AAA999",
-        isPassenger: false,
-        isDriver: true,
-        password: "123456",
-    };
-    const responseSignup = await axios.post("http://localhost:3000/signup", inputSignup);
-    expect(responseSignup.status).toBe(422);
-    expect(responseSignup.data.message).toBe("Invalid car plate");
+afterEach(async () => {
+	await databaseConnection.close();
 });
